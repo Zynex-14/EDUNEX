@@ -113,9 +113,19 @@ export default function Login() {
       toast.error('Passwords do not match.');
       return;
     }
+
+    const rawEmail = (collegeForm.contactEmail || '').trim();
+    if (rawEmail) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(rawEmail)) {
+        toast.error('Please enter a complete and valid email address (e.g. name@gmail.com or info@college.edu)');
+        return;
+      }
+    }
+
     setLoading(true);
     try {
-      const email = collegeForm.contactEmail || `${collegeForm.institutionName.toLowerCase().replace(/\s+/g, '')}@edunex.in`;
+      const email = rawEmail || `${collegeForm.institutionName.toLowerCase().replace(/[^a-z0-9]/g, '')}@edunex.in`;
       const password = collegeForm.password;
       
       let token, user;
@@ -126,7 +136,7 @@ export default function Login() {
           try {
             ({ token, user } = await loginWithEmailAndPassword(email, password));
           } catch (lErr) {
-            toast.error('This email is already registered. Please enter the existing password or switch to Sign In.');
+            toast.error('This email is already registered. Please sign in or use the existing password.');
             setLoading(false);
             return;
           }
@@ -135,10 +145,17 @@ export default function Login() {
         }
       }
 
-      localStorage.setItem('sb_token', token);
+      const uid = user?.uid || user?.id || (auth.currentUser ? auth.currentUser.uid : null);
+      if (!uid) {
+        throw new Error('Authentication completed, but unable to acquire user identifier.');
+      }
+
+      if (token) localStorage.setItem('sb_token', token);
 
       // Save directly to Firestore database
-      await setDocument('users', user.uid, {
+      await setDocument('users', uid, {
+        uid,
+        id: uid,
         role: 'college',
         name: collegeForm.institutionName,
         email,
@@ -147,13 +164,14 @@ export default function Login() {
         verificationStatus: 'pending_admin',
       });
 
-      await setDocument('colleges', user.uid, {
-        uid: user.uid,
-        adminUid: user.uid,
+      await setDocument('colleges', uid, {
+        uid,
+        id: uid,
+        adminUid: uid,
         name: collegeForm.institutionName,
         managementName: collegeForm.managementName,
         contactPhone: collegeForm.contactPhone,
-        contactEmail: collegeForm.contactEmail || email,
+        contactEmail: rawEmail || email,
         website: collegeForm.website || '',
         city: collegeForm.city || '',
         state: collegeForm.state || '',
@@ -166,12 +184,12 @@ export default function Login() {
 
       await addDocument('verificationRequests', {
         type: 'college_to_admin',
-        applicantUid: user.uid,
+        applicantUid: uid,
         applicantEmail: email,
         institutionName: collegeForm.institutionName,
         managementName: collegeForm.managementName,
         contactPhone: collegeForm.contactPhone,
-        contactEmail: collegeForm.contactEmail || email,
+        contactEmail: rawEmail || email,
         website: collegeForm.website || '',
         city: collegeForm.city || '',
         state: collegeForm.state || '',
@@ -188,7 +206,8 @@ export default function Login() {
       }
 
       login(token, {
-        uid: user.uid,
+        uid,
+        id: uid,
         email,
         role: 'college',
         name: collegeForm.institutionName,
@@ -216,9 +235,19 @@ export default function Login() {
       toast.error('Passwords do not match.');
       return;
     }
+
+    const rawEmail = (companyForm.contactEmail || '').trim();
+    if (rawEmail) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(rawEmail)) {
+        toast.error('Please enter a complete and valid email address (e.g. name@gmail.com or hr@company.com)');
+        return;
+      }
+    }
+
     setLoading(true);
     try {
-      const email = companyForm.contactEmail || `${companyForm.companyName.toLowerCase().replace(/\s+/g, '')}@edunex.in`;
+      const email = rawEmail || `${companyForm.companyName.toLowerCase().replace(/[^a-z0-9]/g, '')}@edunex.in`;
       const password = companyForm.password;
 
       let token, user;
@@ -229,7 +258,7 @@ export default function Login() {
           try {
             ({ token, user } = await loginWithEmailAndPassword(email, password));
           } catch (lErr) {
-            toast.error('This email is already registered. Please enter the existing password or switch to Sign In.');
+            toast.error('This email is already registered. Please sign in or use the existing password.');
             setLoading(false);
             return;
           }
@@ -238,10 +267,17 @@ export default function Login() {
         }
       }
       
-      localStorage.setItem('sb_token', token);
+      const uid = user?.uid || user?.id || (auth.currentUser ? auth.currentUser.uid : null);
+      if (!uid) {
+        throw new Error('Authentication completed, but unable to acquire user identifier.');
+      }
+
+      if (token) localStorage.setItem('sb_token', token);
 
       // Save directly to Firestore database
-      await setDocument('users', user.uid, {
+      await setDocument('users', uid, {
+        uid,
+        id: uid,
         role: 'industry',
         name: companyForm.companyName,
         email,
@@ -250,15 +286,16 @@ export default function Login() {
         verificationStatus: 'pending_admin',
       });
 
-      await setDocument('industries', user.uid, {
-        uid: user.uid,
+      await setDocument('industries', uid, {
+        uid,
+        id: uid,
         name: companyForm.companyName,
         industrySector: companyForm.industrySector || '',
         companySize: companyForm.companySize || '',
         website: companyForm.website || '',
         managementName: companyForm.managementName,
         contactPhone: companyForm.contactPhone,
-        contactEmail: companyForm.contactEmail || email,
+        contactEmail: rawEmail || email,
         city: companyForm.city || '',
         state: companyForm.state || '',
         verified: false,
@@ -270,14 +307,14 @@ export default function Login() {
 
       await addDocument('verificationRequests', {
         type: 'company_to_admin',
-        applicantUid: user.uid,
+        applicantUid: uid,
         applicantEmail: email,
         companyName: companyForm.companyName,
         industrySector: companyForm.industrySector || '',
         companySize: companyForm.companySize || '',
         managementName: companyForm.managementName,
         contactPhone: companyForm.contactPhone,
-        contactEmail: companyForm.contactEmail || email,
+        contactEmail: rawEmail || email,
         website: companyForm.website || '',
         city: companyForm.city || '',
         state: companyForm.state || '',
@@ -292,7 +329,8 @@ export default function Login() {
       }
 
       login(token, {
-        uid: user.uid,
+        uid,
+        id: uid,
         email,
         role: 'industry',
         name: companyForm.companyName,

@@ -44,13 +44,18 @@ export const addDocument = async (collectionName, data) => {
  */
 export const setDocument = async (collectionName, docId, data) => {
   try {
-    const docRef = doc(db, collectionName, docId);
+    const validId = docId || data?.uid || data?.id;
+    if (!validId) {
+      console.warn(`⚠️ [Firestore Warning] setDocument called on '${collectionName}' with missing ID. Using addDocument.`);
+      return await addDocument(collectionName, data);
+    }
+    const docRef = doc(db, collectionName, String(validId));
     await setDoc(docRef, {
       ...data,
       updatedAt: serverTimestamp()
     }, { merge: true });
-    console.log(`🔥 [Firestore] Document set for ${collectionName}/${docId}`);
-    return { id: docId, ...data };
+    console.log(`🔥 [Firestore] Document set for ${collectionName}/${validId}`);
+    return { id: String(validId), ...data };
   } catch (error) {
     console.error(`❌ [Firestore Error] Failed to set document ${collectionName}/${docId}:`, error);
     throw error;
@@ -64,10 +69,14 @@ export const setDocument = async (collectionName, docId, data) => {
  */
 export const getDocument = async (collectionName, docId) => {
   try {
-    const docRef = doc(db, collectionName, docId);
+    if (!docId) {
+      console.warn(`⚠️ [Firestore] getDocument called on ${collectionName} with empty docId.`);
+      return null;
+    }
+    const docRef = doc(db, collectionName, String(docId));
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
-      return { id: docSnap.id, ...docSnap.data() };
+      return { id: docSnap.id, uid: docSnap.id, ...docSnap.data() };
     } else {
       console.warn(`⚠️ [Firestore] No document found at ${collectionName}/${docId}`);
       return null;
@@ -109,7 +118,11 @@ export const getCollectionData = async (collectionName, constraints = []) => {
  */
 export const updateDocument = async (collectionName, docId, updateData) => {
   try {
-    const docRef = doc(db, collectionName, docId);
+    if (!docId) {
+      console.warn(`⚠️ [Firestore Warning] updateDocument called on '${collectionName}' with missing docId.`);
+      return;
+    }
+    const docRef = doc(db, collectionName, String(docId));
     await updateDoc(docRef, {
       ...updateData,
       updatedAt: serverTimestamp()
@@ -128,7 +141,8 @@ export const updateDocument = async (collectionName, docId, updateData) => {
  */
 export const deleteDocument = async (collectionName, docId) => {
   try {
-    const docRef = doc(db, collectionName, docId);
+    if (!docId) return;
+    const docRef = doc(db, collectionName, String(docId));
     await deleteDoc(docRef);
     console.log(`🔥 [Firestore] Deleted document ${collectionName}/${docId}`);
   } catch (error) {

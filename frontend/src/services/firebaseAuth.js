@@ -24,6 +24,7 @@ export const loginWithEmailAndPassword = async (email, password) => {
 
     // Fetch user role & profile from Firestore
     let userData = {
+      uid: firebaseUser.uid,
       id: firebaseUser.uid,
       email: firebaseUser.email,
       name: firebaseUser.displayName || email.split('@')[0],
@@ -35,7 +36,7 @@ export const loginWithEmailAndPassword = async (email, password) => {
       const userDocRef = doc(db, "users", firebaseUser.uid);
       const userSnap = await getDoc(userDocRef);
       if (userSnap.exists()) {
-        userData = { ...userData, ...userSnap.data() };
+        userData = { ...userData, ...userSnap.data(), uid: firebaseUser.uid, id: firebaseUser.uid };
       } else {
         // Create user document if missing
         await setDoc(userDocRef, {
@@ -69,6 +70,7 @@ export const registerWithEmailAndPassword = async ({ email, password, first_name
     await updateProfile(firebaseUser, { displayName });
 
     const userData = {
+      uid: firebaseUser.uid,
       id: firebaseUser.uid,
       email: firebaseUser.email,
       name: displayName,
@@ -107,6 +109,7 @@ export const loginWithGoogle = async (role = 'student') => {
 
     const userDocRef = doc(db, "users", firebaseUser.uid);
     let userData = {
+      uid: firebaseUser.uid,
       id: firebaseUser.uid,
       email: firebaseUser.email,
       name: firebaseUser.displayName || firebaseUser.email.split('@')[0],
@@ -118,7 +121,7 @@ export const loginWithGoogle = async (role = 'student') => {
       const userSnap = await getDoc(userDocRef);
       if (userSnap.exists()) {
         const existingData = userSnap.data();
-        userData = { ...userData, ...existingData };
+        userData = { ...userData, ...existingData, uid: firebaseUser.uid, id: firebaseUser.uid };
       } else {
         // Save new user from Google Sign In
         await setDoc(userDocRef, {
