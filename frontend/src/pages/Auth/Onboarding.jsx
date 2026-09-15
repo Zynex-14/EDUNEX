@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { registerStudent } from '../../api/auth';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
+import { getCollectionData, setDocument, updateDocument, addDocument } from '../../services/firebaseDb';
+import { INDIAN_COLLEGES } from '../../data/colleges';
 import api from '../../api/axios';
 import logo from '../../assets/logo.jpeg';
 
@@ -27,16 +29,40 @@ export default function Onboarding() {
   const toast = useToast();
   const navigate = useNavigate();
 
-  // Fetch verified colleges from database on mount
+  // Fetch verified colleges from database on mount (with Firestore fallback)
   useEffect(() => {
     const fetchColleges = async () => {
       try {
-        const res = await api.get('/auth/colleges');
-        if (res.data.success) {
-          setDbColleges(res.data.data.map(c => c.name));
+        let names = [];
+        // 1. Try Firestore direct
+        try {
+          const firestoreColleges = await getCollectionData('colleges');
+          if (firestoreColleges && firestoreColleges.length > 0) {
+            names = firestoreColleges.map(c => c.name).filter(Boolean);
+          }
+        } catch (fErr) {
+          console.warn('Firestore colleges query fallback:', fErr.message);
         }
+
+        // 2. Try REST API if available
+        if (names.length === 0) {
+          try {
+            const res = await api.get('/auth/colleges');
+            if (res.data.success && res.data.data) {
+              names = res.data.data.map(c => c.name);
+            }
+          } catch (apiErr) {
+            // Ignore if backend offline
+          }
+        }
+
+        // 3. Fallback to master Indian colleges list
+        const fallbackNames = INDIAN_COLLEGES.map(c => c.name);
+        const combined = Array.from(new Set([...names, ...fallbackNames]));
+        setDbColleges(combined);
       } catch (err) {
         console.error('Failed to fetch colleges:', err);
+        setDbColleges(INDIAN_COLLEGES.map(c => c.name));
       }
     };
     fetchColleges();
@@ -60,23 +86,81 @@ export default function Onboarding() {
       toast.error('Please fill in all required fields.');
       return;
     }
-    
-    // Ensure the selected college is from the registered database
-    if (!dbColleges.includes(form.college)) {
-      toast.error('Please select a registered college from the dropdown list.');
-      return;
-    }
 
     setLoading(true);
     try {
-      const res = await registerStudent(form);
-      if (res.data.success) {
-        toast.success('Profile saved! Awaiting college verification.');
-        updateUser({ ...res.data.user, needsOnboarding: false });
-        navigate('/student/dashboard');
+      const name = `${form.firstName} ${form.lastName || ''}`.trim();
+      const uid = user?.uid;
+
+      if (!uid) {
+        toast.error('Session expired. Please sign in again.');
+        navigate('/login');
+        return;
       }
+
+      // Save directly to Firestore client-side
+      await updateDocument('users', uid, {
+        role: 'student',
+        name,
+        email: user.email,
+        onboardingCompleted: true,
+        college: form.college,
+        verified: false,
+        verificationStatus: 'pending',
+      });
+
+      await setDocument('students', uid, {
+        uid,
+        firstName: form.firstName,
+        lastName: form.lastName || '',
+        name,
+        email: user.email,
+        college: form.college,
+        degree: form.degree || '',
+        department: form.department || '',
+        currentYear: Number(form.currentYear) || 1,
+        currentSemester: Number(form.currentSemester) || 1,
+        graduationYear: Number(form.graduationYear) || new Date().getFullYear() + 3,
+        skills: [],
+        projects: [],
+        certifications: [],
+        isOpenToWork: false,
+        verificationStatus: 'pending',
+      });
+
+      await addDocument('verificationRequests', {
+        type: 'student_to_college',
+        studentUid: uid,
+        studentName: name,
+        studentEmail: user.email,
+        college: form.college,
+        degree: form.degree,
+        department: form.department,
+        currentYear: Number(form.currentYear) || 1,
+        graduationYear: Number(form.graduationYear) || null,
+        status: 'pending',
+      });
+
+      // Optional backend API notification
+      try {
+        await registerStudent(form);
+      } catch (apiErr) {
+        console.warn('Backend API notification skipped (saved directly to Firestore):', apiErr.message);
+      }
+
+      toast.success('Profile saved! Awaiting college verification.');
+      updateUser({
+        ...user,
+        role: 'student',
+        name,
+        college: form.college,
+        verified: false,
+        verificationStatus: 'pending',
+        needsOnboarding: false
+      });
+      navigate('/student/dashboard');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to complete profile.');
+      toast.error(err.message || 'Failed to complete profile.');
     } finally {
       setLoading(false);
     }

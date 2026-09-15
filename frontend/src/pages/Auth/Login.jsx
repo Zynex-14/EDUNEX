@@ -6,6 +6,7 @@ import {
   registerWithEmailAndPassword,
   getFirebaseErrorMessage,
 } from '../../services/firebaseAuth';
+import { setDocument, addDocument } from '../../services/firebaseDb';
 import { registerStudent, registerCollege, registerCompany } from '../../api/auth';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
@@ -54,8 +55,17 @@ export default function Login() {
     try {
       let token, user;
       if (mode === 'register') {
-        ({ token, user } = await registerWithEmailAndPassword({ email: studentForm.email, password: studentForm.password, role: 'student' }));
-        user.needsOnboarding = true; // New students always need onboarding
+        try {
+          ({ token, user } = await registerWithEmailAndPassword({ email: studentForm.email, password: studentForm.password, role: 'student' }));
+          user.needsOnboarding = true; // New students always need onboarding
+        } catch (regErr) {
+          if (regErr.code === 'auth/email-already-in-use') {
+            // If already registered, attempt sign-in
+            ({ token, user } = await loginWithEmailAndPassword(studentForm.email, studentForm.password));
+          } else {
+            throw regErr;
+          }
+        }
       } else {
         ({ token, user } = await loginWithEmailAndPassword(studentForm.email, studentForm.password));
       }
@@ -105,23 +115,91 @@ export default function Login() {
     }
     setLoading(true);
     try {
-      // Register with Firebase first (email required)
       const email = collegeForm.contactEmail || `${collegeForm.institutionName.toLowerCase().replace(/\s+/g, '')}@edunex.in`;
       const password = collegeForm.password;
-      const { token } = await registerWithEmailAndPassword({ email, password, role: 'college', name: collegeForm.institutionName });
+      
+      let token, user;
+      try {
+        ({ token, user } = await registerWithEmailAndPassword({ email, password, role: 'college', name: collegeForm.institutionName }));
+      } catch (authErr) {
+        if (authErr.code === 'auth/email-already-in-use') {
+          try {
+            ({ token, user } = await loginWithEmailAndPassword(email, password));
+          } catch (lErr) {
+            toast.error('This email is already registered. Please enter the existing password or switch to Sign In.');
+            setLoading(false);
+            return;
+          }
+        } else {
+          throw authErr;
+        }
+      }
 
-      // Save token to localStorage so api calls work
       localStorage.setItem('sb_token', token);
 
-      // Submit college registration to backend
-      const res = await registerCollege(collegeForm);
-      if (res.data.success) {
-        login(token, { ...res.data.user, needsOnboarding: false });
-        toast.success('Registration submitted! Admin will review and approve your account.');
-        navigate('/college/dashboard');
+      // Save directly to Firestore database
+      await setDocument('users', user.uid, {
+        role: 'college',
+        name: collegeForm.institutionName,
+        email,
+        onboardingCompleted: true,
+        verified: false,
+        verificationStatus: 'pending_admin',
+      });
+
+      await setDocument('colleges', user.uid, {
+        uid: user.uid,
+        adminUid: user.uid,
+        name: collegeForm.institutionName,
+        managementName: collegeForm.managementName,
+        contactPhone: collegeForm.contactPhone,
+        contactEmail: collegeForm.contactEmail || email,
+        website: collegeForm.website || '',
+        city: collegeForm.city || '',
+        state: collegeForm.state || '',
+        type: collegeForm.type || 'private',
+        affiliation: collegeForm.affiliation || '',
+        verified: false,
+        verificationStatus: 'pending_admin',
+        departments: [],
+      });
+
+      await addDocument('verificationRequests', {
+        type: 'college_to_admin',
+        applicantUid: user.uid,
+        applicantEmail: email,
+        institutionName: collegeForm.institutionName,
+        managementName: collegeForm.managementName,
+        contactPhone: collegeForm.contactPhone,
+        contactEmail: collegeForm.contactEmail || email,
+        website: collegeForm.website || '',
+        city: collegeForm.city || '',
+        state: collegeForm.state || '',
+        collegeType: collegeForm.type || 'private',
+        affiliation: collegeForm.affiliation || '',
+        status: 'pending',
+      });
+
+      // Optional backend API notification (skips gracefully if backend is offline/static on Vercel)
+      try {
+        await registerCollege(collegeForm);
+      } catch (apiErr) {
+        console.warn('Backend API notification skipped (saved directly to Firestore):', apiErr.message);
       }
+
+      login(token, {
+        uid: user.uid,
+        email,
+        role: 'college',
+        name: collegeForm.institutionName,
+        verified: false,
+        verificationStatus: 'pending_admin',
+        needsOnboarding: false
+      });
+      toast.success('Registration submitted! Admin will review and approve your account.');
+      navigate('/college/dashboard');
     } catch (err) {
-      toast.error(err.response?.data?.message || getFirebaseErrorMessage(err) || 'Registration failed.');
+      toast.error(getFirebaseErrorMessage(err) || 'Registration failed.');
     } finally {
       setLoading(false);
     }
@@ -142,19 +220,90 @@ export default function Login() {
     try {
       const email = companyForm.contactEmail || `${companyForm.companyName.toLowerCase().replace(/\s+/g, '')}@edunex.in`;
       const password = companyForm.password;
-      const { token } = await registerWithEmailAndPassword({ email, password, role: 'industry', name: companyForm.companyName });
+
+      let token, user;
+      try {
+        ({ token, user } = await registerWithEmailAndPassword({ email, password, role: 'industry', name: companyForm.companyName }));
+      } catch (authErr) {
+        if (authErr.code === 'auth/email-already-in-use') {
+          try {
+            ({ token, user } = await loginWithEmailAndPassword(email, password));
+          } catch (lErr) {
+            toast.error('This email is already registered. Please enter the existing password or switch to Sign In.');
+            setLoading(false);
+            return;
+          }
+        } else {
+          throw authErr;
+        }
+      }
       
-      // Save token to localStorage so api calls work
       localStorage.setItem('sb_token', token);
 
-      const res = await registerCompany(companyForm);
-      if (res.data.success) {
-        login(token, { ...res.data.user, needsOnboarding: false });
-        toast.success('Registration submitted! Admin will review and approve your account.');
-        navigate('/industry/dashboard');
+      // Save directly to Firestore database
+      await setDocument('users', user.uid, {
+        role: 'industry',
+        name: companyForm.companyName,
+        email,
+        onboardingCompleted: true,
+        verified: false,
+        verificationStatus: 'pending_admin',
+      });
+
+      await setDocument('industries', user.uid, {
+        uid: user.uid,
+        name: companyForm.companyName,
+        industrySector: companyForm.industrySector || '',
+        companySize: companyForm.companySize || '',
+        website: companyForm.website || '',
+        managementName: companyForm.managementName,
+        contactPhone: companyForm.contactPhone,
+        contactEmail: companyForm.contactEmail || email,
+        city: companyForm.city || '',
+        state: companyForm.state || '',
+        verified: false,
+        verificationStatus: 'pending_admin',
+        activeJobs: 0,
+        activeInternships: 0,
+        activeCourses: 0,
+      });
+
+      await addDocument('verificationRequests', {
+        type: 'company_to_admin',
+        applicantUid: user.uid,
+        applicantEmail: email,
+        companyName: companyForm.companyName,
+        industrySector: companyForm.industrySector || '',
+        companySize: companyForm.companySize || '',
+        managementName: companyForm.managementName,
+        contactPhone: companyForm.contactPhone,
+        contactEmail: companyForm.contactEmail || email,
+        website: companyForm.website || '',
+        city: companyForm.city || '',
+        state: companyForm.state || '',
+        status: 'pending',
+      });
+
+      // Optional backend API notification
+      try {
+        await registerCompany(companyForm);
+      } catch (apiErr) {
+        console.warn('Backend API notification skipped (saved directly to Firestore):', apiErr.message);
       }
+
+      login(token, {
+        uid: user.uid,
+        email,
+        role: 'industry',
+        name: companyForm.companyName,
+        verified: false,
+        verificationStatus: 'pending_admin',
+        needsOnboarding: false
+      });
+      toast.success('Registration submitted! Admin will review and approve your account.');
+      navigate('/industry/dashboard');
     } catch (err) {
-      toast.error(err.response?.data?.message || getFirebaseErrorMessage(err) || 'Registration failed.');
+      toast.error(getFirebaseErrorMessage(err) || 'Registration failed.');
     } finally {
       setLoading(false);
     }
@@ -162,6 +311,7 @@ export default function Login() {
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
+
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--gradient-hero)', padding: 'var(--space-4)', position: 'relative', overflow: 'hidden' }}>
       <div className="hero-glow hero-glow-1" />
 
