@@ -162,19 +162,19 @@ export default function Login() {
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--gradient-hero)', padding: 'var(--space-6)', position: 'relative', overflow: 'hidden' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--gradient-hero)', padding: 'var(--space-4)', position: 'relative', overflow: 'hidden' }}>
       <div className="hero-glow hero-glow-1" />
 
-      <div style={{ width: '100%', maxWidth: 520, position: 'relative', zIndex: 1 }}>
+      <div style={{ width: '100%', maxWidth: 520, position: 'relative', zIndex: 1, margin: 'var(--space-4) 0' }}>
         {/* Logo */}
-        <div style={{ textAlign: 'center', marginBottom: 'var(--space-8)' }}>
+        <div style={{ textAlign: 'center', marginBottom: 'var(--space-6)' }}>
           <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-3)', fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.5rem', textDecoration: 'none' }}>
             <img src={logo} alt="EduNex Logo" style={{ width: 40, height: 40, background: '#fff', borderRadius: 'var(--radius-lg)', padding: '2px', objectFit: 'contain' }} />
             <span className="text-gradient">EduNex</span>
           </Link>
         </div>
 
-        <div className="card" style={{ padding: 'var(--space-8)' }}>
+        <div className="card" style={{ padding: 'var(--space-6)' }}>
           {/* Role Selector */}
           <div style={{ marginBottom: 'var(--space-6)' }}>
             <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: 'var(--space-3)', textTransform: 'uppercase', letterSpacing: 1 }}>I am a</p>
@@ -186,16 +186,16 @@ export default function Login() {
                   onClick={() => setSelectedRole(r.key)}
                   style={{
                     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-                    padding: 'var(--space-3) var(--space-2)',
+                    padding: 'var(--space-3) var(--space-1)',
                     borderRadius: 'var(--radius-md)',
                     border: `2px solid ${selectedRole === r.key ? 'var(--color-primary)' : 'var(--border-default)'}`,
                     background: selectedRole === r.key ? 'var(--color-primary-light)' : 'transparent',
                     cursor: 'pointer', transition: 'all 0.2s',
                   }}
                 >
-                  <span style={{ fontSize: '1.5rem' }}>{r.icon}</span>
-                  <span style={{ fontWeight: 700, fontSize: '0.8rem', color: selectedRole === r.key ? 'var(--color-primary)' : 'var(--text-primary)' }}>{r.label}</span>
-                  <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textAlign: 'center', lineHeight: 1.3 }}>{r.desc}</span>
+                  <span style={{ fontSize: '1.4rem' }}>{r.icon}</span>
+                  <span style={{ fontWeight: 700, fontSize: '0.78rem', color: selectedRole === r.key ? 'var(--color-primary)' : 'var(--text-primary)' }}>{r.label}</span>
+                  <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)', textAlign: 'center', lineHeight: 1.2 }}>{r.desc}</span>
                 </button>
               ))}
             </div>
@@ -298,7 +298,7 @@ export default function Login() {
                   value={collegeForm.institutionName} onChange={e => setCollegeForm(p => ({ ...p, institutionName: e.target.value }))} required />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+              <div className="form-grid-2">
                 <div className="form-group">
                   <label className="form-label">Type</label>
                   <select id="college-type" className="form-input" value={collegeForm.type} onChange={e => setCollegeForm(p => ({ ...p, type: e.target.value }))}>
@@ -323,7 +323,7 @@ export default function Login() {
                     <input id="college-contact-name" className="form-input" placeholder="e.g. Board of Directors / Dean"
                       value={collegeForm.managementName} onChange={e => setCollegeForm(p => ({ ...p, managementName: e.target.value }))} required />
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+                  <div className="form-grid-2">
                     <div className="form-group">
                       <label className="form-label">Contact Phone *</label>
                       <input id="college-phone" type="tel" className="form-input" placeholder="+91 98765 43210"
@@ -335,7 +335,7 @@ export default function Login() {
                         value={collegeForm.contactEmail} onChange={e => setCollegeForm(p => ({ ...p, contactEmail: e.target.value }))} />
                     </div>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+                  <div className="form-grid-2">
                     <div className="form-group">
                       <label className="form-label">City</label>
                       <input id="college-city" className="form-input" placeholder="Chennai"
@@ -390,7 +390,7 @@ export default function Login() {
                   value={companyForm.companyName} onChange={e => setCompanyForm(p => ({ ...p, companyName: e.target.value }))} required />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+              <div className="form-grid-2">
                 <div className="form-group">
                   <label className="form-label">Industry Sector</label>
                   <select id="company-sector" className="form-input" value={companyForm.industrySector} onChange={e => setCompanyForm(p => ({ ...p, industrySector: e.target.value }))}>
@@ -426,7 +426,7 @@ export default function Login() {
                     <input id="company-contact-name" className="form-input" placeholder="e.g. HR Department / Board"
                       value={companyForm.managementName} onChange={e => setCompanyForm(p => ({ ...p, managementName: e.target.value }))} required />
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+                  <div className="form-grid-2">
                     <div className="form-group">
                       <label className="form-label">Contact Phone *</label>
                       <input id="company-phone" type="tel" className="form-input" placeholder="+91 98765 43210"
@@ -438,7 +438,7 @@ export default function Login() {
                         value={companyForm.contactEmail} onChange={e => setCompanyForm(p => ({ ...p, contactEmail: e.target.value }))} />
                     </div>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+                  <div className="form-grid-2">
                     <div className="form-group">
                       <label className="form-label">City</label>
                       <input id="company-city" className="form-input" placeholder="Bangalore"
